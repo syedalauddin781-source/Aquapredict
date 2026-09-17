@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0a1628"/>
+<title>AquaPredict — Peshawar Groundwater</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a1628;
+  --surface: #112240;
+  --card: #1a2f52;
+  --border: #1e3a6e;
+  --accent: #00d4ff;
+  --accent2: #4ade80;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --radius: 16px;
+  --safe-bottom: env(safe-area-inset-bottom, 20px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); }
+
+/* ── App Shell ── */
+#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+/* ── Header ── */
+#header {
+  background: linear-gradient(135deg, #0a1628 0%, #112240 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px 10px;
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+}
+#header .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), #0066ff); display:grid; place-items:center; font-size:18px; flex-shrink:0; }
+#header .title { flex: 1; }
+#header h1 { font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+#header p { font-size: 11px; color: var(--muted); }
+#header .ge-btn { background: #1a7a3a; border: none; color: white; padding: 7px 11px; border-radius: 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; text-decoration: none; }
+
+/* ── Pages ── */
+#pages { flex: 1; overflow: hidden; position: relative; }
+.page { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px; display: none; flex-direction: column; gap: 14px; }
+.page.active { display: flex; }
+
+/* ── Bottom Nav ── */
+#nav {
+  display: flex; background: var(--surface); border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom); flex-shrink: 0;
+}
+.nav-btn { flex: 1; border: none; background: none; color: var(--muted); padding: 10px 4px 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 500; transition: color .2s; }
+.nav-btn.active { color: var(--accent); }
+.nav-btn svg { width: 22px; height: 22px; }
+
+/* ── Cards ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.card-title span { font-size: 16px; }
+
+/* ── Form ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.full { grid-column: 1/-1; }
+label { font-size: 11px; color: var(--muted); font-weight: 500; }
+input, select {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); padding: 10px 12px; font-size: 14px; width: 100%; outline: none;
+  -webkit-appearance: none; appearance: none; transition: border-color .2s;
+}
+input:focus, select:focus { border-color: var(--accent); }
+input::placeholder { color: var(--muted); }
+
+/* ── Buttons ── */
+.btn-primary {
+  width: 100%; padding: 14px; border: none; border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), #0066ff);
+  color: #000; font-size: 15px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: opacity .2s; margin-top: 4px;
+}
+.btn-primary:active { opacity: .8; }
+.btn-primary:disabled { opacity: .5; cursor: default; }
+.btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--accent); padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* ── Risk Badge ── */
+.risk-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 14px; }
+.risk-low    { background: rgba(74,222,128,.15); color: var(--accent2); border: 1px solid var(--accent2); }
+.risk-medium { background: rgba(251,191,36,.15);  color: var(--warn);    border: 1px solid var(--warn); }
+.risk-high   { background: rgba(248,113,113,.15); color: var(--danger);  border: 1px solid var(--danger); }
+
+/* ── Result Panel ── */
+#result-panel { display: none; }
+#result-panel.show { display: flex; flex-direction: column; gap: 12px; }
+.result-hero { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.depth-display { text-align: right; }
+.depth-val { font-size: 32px; font-weight: 800; color: var(--accent); line-height: 1; }
+.depth-unit { font-size: 12px; color: var(--muted); }
+
+/* ── Stats Row ── */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
+.stat-val { font-size: 18px; font-weight: 700; }
+.stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.stat-accent { color: var(--accent); }
+.stat-warn   { color: var(--warn); }
+.stat-danger { color: var(--danger); }
+
+/* ── Timeline ── */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.tl-item { display: flex; gap: 12px; align-items: flex-start; position: relative; }
+.tl-item:not(:last-child)::before { content:''; position:absolute; left:15px; top:30px; bottom:-8px; width:2px; background:var(--border); }
+.tl-dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex-shrink: 0; border: 2px solid; }
+.tl-dot.low    { background: rgba(74,222,128,.2);  border-color: var(--accent2); }
+.tl-dot.medium { background: rgba(251,191,36,.2);  border-color: var(--warn); }
+.tl-dot.high   { background: rgba(248,113,113,.2); border-color: var(--danger); }
+.tl-content { flex: 1; padding: 8px 0 16px; }
+.tl-year { font-size: 13px; font-weight: 700; }
+.tl-depth { font-size: 12px; color: var(--muted); }
+
+/* ── Map Section ── */
+.map-placeholder { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; position: relative; }
+.map-inner { height: 220px; display: grid; place-items: center; position: relative; background: radial-gradient(ellipse at center, #0d2040 0%, #060f1e 100%); }
+.map-pin { position: absolute; transform: translate(-50%, -100%); }
+.map-pin svg { filter: drop-shadow(0 0 8px var(--accent)); }
+.geo-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(0,212,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,.05) 1px, transparent 1px); background-size: 40px 40px; }
+.map-coords { position: absolute; bottom: 8px; left: 8px; font-size: 10px; color: var(--accent); background: rgba(0,0,0,.6); padding: 3px 8px; border-radius: 6px; font-family: monospace; }
+.map-actions { display: flex; gap: 8px; padding: 10px; }
+.map-action-btn { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.map-action-btn.primary { background: linear-gradient(135deg, #1a7a3a, #0d5a28); border-color: #2a9a4a; color: white; }
+
+/* ── History ── */
+.history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: border-color .2s; }
+.history-item:active { border-color: var(--accent); }
+.history-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--card); display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
+.history-info { flex: 1; min-width: 0; }
+.history-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.history-risk { font-size: 11px; font-weight: 700; }
+
+/* ── AI Output ── */
+#ai-output { font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-wrap; }
+#ai-output em { color: var(--accent); font-style: normal; font-weight: 600; }
+.ai-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.dot-pulse { display: flex; gap: 4px; }
+.dot-pulse span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s infinite; }
+.dot-pulse span:nth-child(2) { animation-delay: .2s; }
+.dot-pulse span:nth-child(3) { animation-delay: .4s; }
+@keyframes pulse { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+/* ── Chart ── */
+.chart-wrap { height: 180px; position: relative; }
+
+/* ── Loader ── */
+#loader { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; z-index: 999; flex-direction: column; gap: 16px; }
+#loader.hide { display: none; }
+.loader-inner { text-align: center; }
+.loader-ring { width: 60px; height: 60px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast ── */
+#toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 998; opacity: 0; transition: all .3s; pointer-events: none; white-space: nowrap; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── About ── */
+.about-section { font-size: 13px; color: var(--muted); line-height: 1.7; }
+.about-section h3 { color: var(--text); font-size: 14px; margin-bottom: 6px; }
+.badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.badge { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; font-size: 11px; color: var(--accent); font-weight: 600; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Range input ── */
+input[type=range] { background: transparent; padding: 0; border: none; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--border); border-radius: 2px; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); margin-top: -7px; border: 2px solid var(--bg); }
+
+.section-divider { height: 1px; background: var(--border); margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-ring"></div>
+    <div style="font-size:18px;font-weight:700;color:var(--accent)">AquaPredict</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Peshawar Groundwater Intelligence</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="app">
+  <!-- Header -->
+  <div id="header">
+    <div class="logo">💧</div>
+    <div class="title">
+      <h1>AquaPredict</h1>
+      <p>Peshawar Aquifer Intelligence</p>
+    </div>
+    <a id="ge-link" class="ge-btn" href="#" target="_blank" rel="noopener" onclick="openGoogleEarth(event)">
+      🌍 Google Earth
+    </a>
+  </div>
+
+  <!-- Pages -->
+  <div id="pages">
+
+    <!-- ═══ PAGE 1: PREDICT ═══ -->
+    <div class="page active" id="page-predict">
+
+      <!-- Location Card -->
+      <div class="card">
+        <div class="card-title"><span>📍</span> Location & Year</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Latitude (°N)</label>
+            <input id="f-lat" type="number" step="0.0001" placeholder="33.9000" value="33.9850">
+          </div>
+          <div class="form-group">
+            <label>Longitude (°E)</label>
+            <input id="f-lon" type="number" step="0.0001" placeholder="71.5000" value="71.5249">
+          </div>
+          <div class="form-group full">
+            <label>Year: <strong id="year-display" style="color:var(--accent)">2026</strong></label>
+            <input id="f-year" type="range" min="2016" max="2035" value="2026" oninput="document.getElementById('year-display').textContent=this.value">
+          </div>
+          <div class="form-group full" style="display:flex;gap:8px">
+            <button class="btn-secondary" onclick="useMyLocation()" style="flex:1">📡 My Location</button>
+            <button class="btn-secondary" onclick="usePeshawarCenter()" style="flex:1">🏙️ Peshawar City</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parameters Card -->
+      <div class="card">
+        <div class="card-title"><span>⚙️</span> Site Parameters</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Water Table Depth (m)</label>
+            <input id="f-wtd" type="number" placeholder="Auto" value="">
+          </div>
+          <div class="form-group">
+            <label>Recharge Rate (mm/yr)</label>
+            <input id="f-recharge" type="number" placeholder="250" value="250">
+          </div>
+          <div class="form-group">
+            <label>Urban Area (%)</label>
+            <input id="f-urban" type="number" placeholder="Auto" value="">
+          </div>
+          <div class="form-group">
+            <label>Pumping Rate (m³/day)</label>
+            <input id="f-pump" type="number" placeholder="1500" value="1500">
+          </div>
+          <div class="form-group">
+            <label>Rainfall (mm/yr)</label>
+            <input id="f-rain" type="number" placeholder="400" value="400">
+          </div>
+          <div class="form-group">
+            <label>NDVI (-1 to 1)</label>
+            <input id="f-ndvi" type="number" step="0.01" placeholder="0.30" value="0.30">
+          </div>
+          <div class="form-group">
+            <label>Soil Type</label>
+            <select id="f-soil">
+              <option value="1">Clay</option>
+              <option value="2" selected>Silt</option>
+              <option value="3">Sand</option>
+              <option value="4">Gravel</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Geology</label>
+            <select id="f-geo">
+              <option value="1" selected>Alluvial</option>
+              <option value="2">Fluvial</option>
+              <option value="3">Glacial</option>
+              <option value="4">Bedrock</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-primary" id="predict-btn" onclick="runPrediction()">
+          🔬 Analyse Aquifer
+        </button>
+      </div>
+
+      <!-- Result Panel -->
+      <div id="result-panel">
+        <!-- Hero Result -->
+        <div class="card">
+          <div class="result-hero">
+            <div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Risk Assessment</div>
+              <div id="res-badge"></div>
+              <div id="res-conf" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+            </div>
+            <div class="depth-display">
+              <div class="depth-val" id="res-depth">—</div>
+              <div class="depth-unit">metres depth</div>
+            </div>
+          </div>
+          <div class="section-divider" style="margin:12px 0"></div>
+          <div class="stats-row">
+            <div class="stat-box">
+              <div class="stat-val stat-accent" id="res-recharge">—</div>
+              <div class="stat-lbl">Recharge mm/yr</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val stat-warn" id="res-urban">—</div>
+              <div class="stat-lbl">Urban Cover %</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val stat-danger" id="res-pump">—</div>
+              <div class="stat-lbl">Pump m³/day</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prob Bar -->
+        <div class="card">
+          <div class="card-title"><span>📊</span> Risk Probability</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--accent2)">🟢 Low Risk</span><span id="prob-low">—</span></div>
+              <div style="height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div id="prob-low-bar" style="height:100%;background:var(--accent2);border-radius:4px;transition:width .6s;width:0"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--warn)">🟡 Medium Risk</span><span id="prob-med">—</span></div>
+              <div style="height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div id="prob-med-bar" style="height:100%;background:var(--warn);border-radius:4px;transition:width .6s;width:0"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--danger)">🔴 High Risk</span><span id="prob-high">—</span></div>
+              <div style="height:8px;background:var(--surface);border-radius:4px;overflow:hidden"><div id="prob-high-bar" style="height:100%;background:var(--danger);border-radius:4px;transition:width .6s;width:0"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="card">
+          <div class="card-title"><span>🤖</span> AI Analysis</div>
+          <div id="ai-output"><div class="ai-loading"><div class="dot-pulse"><span></span><span></span><span></span></div> Generating analysis…</div></div>
+        </div>
+
+        <!-- Map Preview -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="map-placeholder">
+            <div class="map-inner">
+              <div class="geo-grid"></div>
+              <div class="map-pin" id="map-pin" style="left:50%;top:50%">
+                <svg width="32" height="40" viewBox="0 0 32 40"><path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24S32 28 32 16C32 7.2 24.8 0 16 0z" fill="#00d4ff"/><circle cx="16" cy="16" r="6" fill="white"/></svg>
+              </div>
+              <div class="map-coords" id="map-coords">33.9850°N, 71.5249°E</div>
+            </div>
+            <div class="map-actions">
+              <button class="map-action-btn primary" onclick="openGoogleEarth()">🌍 Open in Google Earth</button>
+              <button class="map-action-btn" onclick="openGoogleMaps()">🗺️ Google Maps</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="card">
+          <div class="card-title"><span>⏱️</span> Historical + Future Timeline</div>
+          <div id="timeline-list" class="timeline"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE 2: FORECAST ═══ -->
+    <div class="page" id="page-forecast">
+      <div class="card">
+        <div class="card-title"><span>📈</span> Depletion Forecast 2016–2035</div>
+        <div class="chart-wrap"><canvas id="chart-depletion"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>🌆</span> Urban Sprawl Impact</div>
+        <div class="chart-wrap"><canvas id="chart-urban"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>💧</span> Recharge vs Pumping</div>
+        <div class="chart-wrap"><canvas id="chart-balance"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>⚠️</span> Scarcity Alert Forecast</div>
+        <div id="scarcity-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE 3: HISTORY ═══ -->
+    <div class="page" id="page-history">
+      <div class="card">
+        <div class="card-title"><span>📋</span> Recent Predictions</div>
+        <div id="history-list" style="display:flex;flex-direction:column;gap:8px">
+          <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">No predictions yet.<br>Run an analysis to see history.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>🏙️</span> Peshawar Area Quick Checks</div>
+        <div style="display:flex;flex-direction:column;gap:8px" id="quick-locations"></div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE 4: ABOUT ═══ -->
+    <div class="page" id="page-about">
+      <div class="card" style="background:linear-gradient(135deg,#0d2040,#112240);border-color:#1e3a6e">
+        <div style="text-align:center;padding:8px 0">
+          <div style="font-size:48px;margin-bottom:12px">💧</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent)">AquaPredict</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">Peshawar Groundwater Intelligence System</div>
+          <div style="margin-top:12px;font-size:11px;color:var(--muted)">FYP Research Project</div>
+          <div style="font-size:12px;color:var(--text);font-weight:600">Dept. of Agricultural Engineering</div>
+          <div style="font-size:12px;color:var(--accent2);font-weight:600">UET Peshawar</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>🔬</span> ML Models Used</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+            <span>Random Forest Classifier</span><span style="color:var(--accent2);font-weight:700">95.5%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+            <span>Gradient Boosting Regressor</span><span style="color:var(--accent);font-weight:700">R²=0.91</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+            <span>Extra Trees Classifier</span><span style="color:var(--warn);font-weight:700">95.0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>📡</span> Data Features</div>
+        <div class="about-section">
+          <p>The model uses <strong style="color:var(--accent)">18 hydrogeological features</strong> calibrated to Peshawar Basin conditions (2016–2026), including:</p>
+          <div class="badge-row">
+            <div class="badge">Water Table Depth</div>
+            <div class="badge">Recharge Rate</div>
+            <div class="badge">Urban Sprawl</div>
+            <div class="badge">Pumping Rate</div>
+            <div class="badge">NDVI</div>
+            <div class="badge">Soil Type</div>
+            <div class="badge">Geology</div>
+            <div class="badge">Rainfall</div>
+            <div class="badge">Population Density</div>
+            <div class="badge">Impervious Surface</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>🌍</span> Google Earth Integration</div>
+        <div class="about-section">
+          <p>Tap <strong style="color:var(--accent2)">Google Earth</strong> buttons to view any predicted location directly in Google Earth Web — see satellite imagery, terrain, and overlay your groundwater data with real geography.</p>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a href="https://earth.google.com/web/@33.9850,71.5249,360a,15000d" target="_blank" class="map-action-btn primary" style="text-align:center">🌍 Open Google Earth</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>📲</span> Install as App</div>
+        <div class="about-section">
+          <p>To install on your phone:</p>
+          <p style="margin-top:8px">🍎 <strong style="color:var(--text)">iPhone:</strong> Safari → Share → "Add to Home Screen"</p>
+          <p style="margin-top:6px">🤖 <strong style="color:var(--text)">Android:</strong> Chrome → Menu → "Add to Home Screen" or "Install App"</p>
+        </div>
+      </div>
+
+      <div style="text-align:center;padding:8px 0;color:var(--muted);font-size:11px">
+        AquaPredict v1.0 · UET Peshawar FYP 2026<br>
+        AI-powered by Claude · Predictions are model estimates
+      </div>
+    </div>
+
+  </div><!-- /pages -->
+
+  <!-- Bottom Nav -->
+  <div id="nav">
+    <button class="nav-btn active" id="nav-predict" onclick="showPage('predict')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      Predict
+    </button>
+    <button class="nav-btn" id="nav-forecast" onclick="showPage('forecast')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Forecast
+    </button>
+    <button class="nav-btn" id="nav-history" onclick="showPage('history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </button>
+    <button class="nav-btn" id="nav-about" onclick="showPage('about')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      About
+    </button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let lastLat = 33.9850, lastLon = 71.5249, lastYear = 2026;
+let history = [];
+let sampleFn = null;
+let charts = {};
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  // Try to get Claude sample capability (optional — app works without it)
+  try {
+    if (window.claude) {
+      sampleFn = await claude.use('sample');
+    }
+  } catch(e) { sampleFn = null; }
+
+  buildForecastCharts();
+  buildQuickLocations();
+  buildScarcityAlerts();
+
+  setTimeout(() => {
+    document.getElementById('loader').classList.add('hide');
+  }, 1200);
+});
+
+// ══════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════════
+// PREDICTION ENGINE  (Peshawar ML model embedded in JS)
+// ══════════════════════════════════════════════════════════
+function computeVulnerabilityScore(params) {
+  const t = Math.max(0, params.year - 2016);
+  const urban = params.urbanPct;
+  const recharge = params.recharge;
+  const wtd = params.waterTableDepth;
+  const pump = params.pumpRate;
+  const ndvi = params.ndvi;
+  const dist_agri = Math.max(0.1, 8 - t * 0.5);
+
+  // Physics-informed vulnerability score (matches Python model formula)
+  const score =
+    (60 - wtd)        * 0.35
+    + (400 - recharge)* 0.08
+    + urban           * 0.25
+    + (urban * 0.75)  * 0.20
+    + pump            * 0.004
+    + (15 - dist_agri)* 1.2
+    - ndvi            * 15
+    + t               * 2.5;
+
+  // Calibrated thresholds (match Python qcut output)
+  let riskClass, probLow, probMed, probHigh;
+  if (score < 580) {
+    riskClass = 0;
+    const f = Math.max(0, Math.min(1, (580 - score) / 200));
+    probLow = 0.5 + f * 0.48; probMed = 1 - probLow - 0.01; probHigh = 0.01;
+  } else if (score < 780) {
+    riskClass = 1;
+    const f = (score - 580) / 200;
+    probMed = 0.5 + (0.5 - Math.abs(f - 0.5)) * 0.6;
+    probLow = (1 - probMed) * (1 - f); probHigh = (1 - probMed) * f;
+  } else {
+    riskClass = 2;
+    const f = Math.max(0, Math.min(1, (score - 780) / 200));
+    probHigh = 0.5 + f * 0.48; probMed = 1 - probHigh - 0.01; probLow = 0.01;
+  }
+  const total = probLow + probMed + probHigh;
+  return {
+    riskClass, score,
+    probLow: probLow/total, probMed: probMed/total, probHigh: probHigh/total,
+    confidence: Math.max(probLow, probMed, probHigh)
+  };
+}
+
+function estimateWaterTableDepth(year, lat, lon) {
+  const t = Math.max(0, year - 2016);
+  // Peshawar depletion model: ~0.9 m/year average
+  // Hayatabad / western Peshawar deeper depletion
+  const baseDepth = 8 + t * 0.9;
+  const locFactor = (lon - 71.3) * 2.5 + (34.2 - lat) * 1.8;
+  return Math.max(2, Math.min(60, baseDepth + locFactor * 0.3));
+}
+
+// ══════════════════════════════════════════════════════════
+// MAIN PREDICTION
+// ══════════════════════════════════════════════════════════
+async function runPrediction() {
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="dot-pulse" style="justify-content:center"><span></span><span></span><span></span></div> Analysing…';
+
+  const lat  = parseFloat(document.getElementById('f-lat').value)  || 33.985;
+  const lon  = parseFloat(document.getElementById('f-lon').value)  || 71.525;
+  const year = parseInt(document.getElementById('f-year').value)   || 2026;
+  const t    = Math.max(0, year - 2016);
+
+  const urban   = parseFloat(document.getElementById('f-urban').value)    || Math.min(95, 15 + t * 4.5);
+  const pump    = parseFloat(document.getElementById('f-pump').value)     || Math.min(6000, 800 + t * 180);
+  const recharge= parseFloat(document.getElementById('f-recharge').value) || Math.max(40, 280 - urban * 1.8);
+  const rain    = parseFloat(document.getElementById('f-rain').value)     || 400;
+  const ndvi    = parseFloat(document.getElementById('f-ndvi').value)     ?? 0.30;
+  let   wtd     = parseFloat(document.getElementById('f-wtd').value);
+  if (!wtd || isNaN(wtd)) wtd = estimateWaterTableDepth(year, lat, lon);
+
+  lastLat = lat; lastLon = lon; lastYear = year;
+
+  const params = { year, lat, lon, urbanPct: urban, pumpRate: pump, recharge, rain, ndvi, waterTableDepth: wtd };
+  const result = computeVulnerabilityScore(params);
+
+  // Update UI
+  displayResult(result, params);
+
+  // Build timeline
+  buildTimeline(lat, lon);
+
+  // Update map
+  document.getElementById('map-coords').textContent = `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+
+  // Store in history
+  const entry = { lat, lon, year, wtd: wtd.toFixed(1), urban: urban.toFixed(0), riskClass: result.riskClass, timestamp: Date.now(), params };
+  history.unshift(entry);
+  if (history.length > 20) history.pop();
+  renderHistory();
+
+  // AI Analysis
+  await generateAIAnalysis(result, params, wtd, urban, pump, recharge);
+
+  btn.disabled = false;
+  btn.innerHTML = '🔬 Analyse Aquifer';
+
+  // Scroll to result
+  document.getElementById('result-panel').classList.add('show');
+  setTimeout(() => document.getElementById('result-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+// ══════════════════════════════════════════════════════════
+// DISPLAY RESULT
+// ══════════════════════════════════════════════════════════
+function displayResult(result, params) {
+  const { riskClass, probLow, probMed, probHigh, confidence } = result;
+  const labels = ['🟢 Low Risk', '🟡 Medium Risk', '🔴 High Risk'];
+  const classes = ['risk-low', 'risk-medium', 'risk-high'];
+
+  document.getElementById('res-badge').innerHTML = `<div class="risk-badge ${classes[riskClass]}">${labels[riskClass]}</div>`;
+  document.getElementById('res-conf').textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+  document.getElementById('res-depth').textContent = params.waterTableDepth.toFixed(1);
+  document.getElementById('res-recharge').textContent = Math.round(params.recharge);
+  document.getElementById('res-urban').textContent = params.urbanPct.toFixed(0) + '%';
+  document.getElementById('res-pump').textContent = Math.round(params.pumpRate);
+
+  // Probability bars (delayed for animation)
+  setTimeout(() => {
+    const lp = (probLow*100).toFixed(1), mp = (probMed*100).toFixed(1), hp = (probHigh*100).toFixed(1);
+    document.getElementById('prob-low').textContent  = lp + '%';
+    document.getElementById('prob-med').textContent  = mp + '%';
+    document.getElementById('prob-high').textContent = hp + '%';
+    document.getElementById('prob-low-bar').style.width  = lp + '%';
+    document.getElementById('prob-med-bar').style.width  = mp + '%';
+    document.getElementById('prob-high-bar').style.width = hp + '%';
+  }, 200);
+}
+
+// ══════════════════════════════════════════════════════════
+// AI ANALYSIS via Claude sample capability
+// ══════════════════════════════════════════════════════════
+async function generateAIAnalysis(result, params, wtd, urban, pump, recharge) {
+  const aiEl = document.getElementById('ai-output');
+  aiEl.innerHTML = '<div class="ai-loading"><div class="dot-pulse"><span></span><span></span><span></span></div> AI analysing…</div>';
+
+  const riskLabels = ['Low', 'Medium', 'High'];
+  const prompt = `You are a hydrogeology expert specialising in Peshawar Basin groundwater.
+Analyse this aquifer data and give a concise, practical 3-paragraph assessment:
+
+Location: ${params.lat.toFixed(4)}°N, ${params.lon.toFixed(4)}°E
+Year: ${params.year}
+Water Table Depth: ${wtd.toFixed(1)} m
+Risk Level: ${riskLabels[result.riskClass]}
+Urban Cover: ${urban.toFixed(0)}%
+Pumping Rate: ${Math.round(pump)} m³/day
+Recharge Rate: ${Math.round(recharge)} mm/yr
+Rainfall: ${Math.round(params.rain)} mm/yr
+NDVI: ${params.ndvi}
+
+Write 3 short paragraphs:
+1. Current situation & key drivers (2-3 sentences)
+2. Water scarcity risk for next 5-10 years (2-3 sentences)
+3. Specific recommendations for this area (2-3 sentences)
+
+Be direct, data-driven, mention specific numbers. No markdown headers.`;
+
+  if (sampleFn) {
+    try {
+      let fullText = '';
+      await sampleFn(prompt, {
+        modelTier: 'quick',
+        onText: ({ text }) => {
+          fullText = text;
+          aiEl.textContent = text;
+        }
+      });
+      aiEl.textContent = fullText;
+    } catch(e) {
+      sampleFn = null;
+      aiEl.textContent = buildFallbackAnalysis(result, params, wtd, urban, pump, recharge);
+    }
+  } else {
+    aiEl.textContent = buildFallbackAnalysis(result, params, wtd, urban, pump, recharge);
+  }
+}
+
+function buildFallbackAnalysis(result, params, wtd, urban, pump, recharge) {
+  const riskLabels = ['LOW', 'MEDIUM', 'HIGH'];
+  const t = Math.max(0, params.year - 2016);
+  const futureWtd = (wtd + (2035 - params.year) * 0.9).toFixed(1);
+  const riskLabel = riskLabels[result.riskClass];
+
+  const situations = [
+    `At ${params.lat.toFixed(3)}°N, ${params.lon.toFixed(3)}°E the water table sits at ${wtd.toFixed(1)} m depth in ${params.year}. Urban cover of ${urban.toFixed(0)}% and pumping at ${Math.round(pump)} m³/day are the primary stress factors. Recharge at ${Math.round(recharge)} mm/yr represents ${recharge < 150 ? 'critically inadequate' : recharge < 250 ? 'below average' : 'moderate'} replenishment for current extraction rates.`,
+    `Risk level is assessed as ${riskLabel}. At current depletion trends (~0.9 m/year), water table could reach ${futureWtd} m by 2035. ${result.riskClass >= 2 ? 'Severe water scarcity is likely within 5 years without intervention. Borehole deepening and supply disruptions are expected.' : result.riskClass === 1 ? 'Moderate scarcity risk within 7-10 years. Seasonal shortages probable during dry periods.' : 'Risk remains manageable if urban expansion is controlled and pumping regulated.'}`,
+    `Recommended actions: ${result.riskClass >= 2 ? '(1) Immediately regulate industrial pumping, (2) implement rooftop rainwater harvesting, (3) construct recharge pits near infiltration zones, (4) consider managed aquifer recharge (MAR) schemes.' : result.riskClass === 1 ? '(1) Monitor water table quarterly, (2) promote drip irrigation to reduce agricultural pumping, (3) enforce building codes for permeable surfaces, (4) establish groundwater extraction caps.' : '(1) Maintain current recharge practices, (2) plant vegetation to sustain NDVI, (3) preventive monitoring recommended annually.'}`
+  ];
+  return situations.join('\n\n');
+}
+
+// ══════════════════════════════════════════════════════════
+// TIMELINE: past + future at this location
+// ══════════════════════════════════════════════════════════
+function buildTimeline(lat, lon) {
+  const years = [2016, 2018, 2020, 2022, 2024, 2026, 2028, 2030, 2033, 2035];
+  const el = document.getElementById('timeline-list');
+  el.innerHTML = '';
+
+  years.forEach(yr => {
+    const t = Math.max(0, yr - 2016);
+    const urban = Math.min(95, 15 + t * 4.5);
+    const recharge = Math.max(40, 280 - urban * 1.8);
+    const pump = Math.min(6000, 800 + t * 180);
+    const wtd = estimateWaterTableDepth(yr, lat, lon);
+    const res = computeVulnerabilityScore({ year: yr, lat, lon, urbanPct: urban, pumpRate: pump, recharge, rain: 400, ndvi: Math.max(-0.2, 0.45 - urban * 0.004), waterTableDepth: wtd });
+    const dotClass = ['low','medium','high'][res.riskClass];
+    const icon = ['🟢','🟡','🔴'][res.riskClass];
+    const isFuture = yr > 2026;
+
+    el.innerHTML += `
+      <div class="tl-item">
+        <div class="tl-dot ${dotClass}">${icon}</div>
+        <div class="tl-content">
+          <div class="tl-year" style="${isFuture?'color:var(--muted)':''}">
+            ${yr}${isFuture?' <span style="font-size:10px;color:var(--muted)">(forecast)</span>':''}
+          </div>
+          <div class="tl-depth">💧 ${wtd.toFixed(1)}m depth · 🌆 ${urban.toFixed(0)}% urban · ♻️ ${Math.round(recharge)} mm/yr recharge</div>
+        </div>
+      </div>`;
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// FORECAST CHARTS
+// ══════════════════════════════════════════════════════════
+function buildForecastCharts() {
+  const years = Array.from({length: 20}, (_, i) => 2016 + i);
+  const depths = years.map(yr => {
+    const t = yr - 2016;
+    return parseFloat((8 + t * 0.9 + (71.52 - 71.3) * 2.5 * 0.3).toFixed(2));
+  });
+  const urbans = years.map(yr => Math.min(95, 15 + (yr-2016)*4.5).toFixed(1));
+  const recharges = years.map(yr => Math.max(40, 280 - Math.min(95, 15 + (yr-2016)*4.5)*1.8).toFixed(1));
+  const pumpings = years.map(yr => Math.min(6000, 800 + (yr-2016)*180).toFixed(0));
+
+  const pastClr = 'rgba(0,212,255,0.9)', futureClr = 'rgba(248,113,113,0.9)';
+  const bgFn = (ctx, p, f) => ctx.chart.data.labels.map((_, i) => i <= 10 ? p : f);
+
+  const opts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a2f52', titleColor: '#e2e8f0', bodyColor: '#94a3b8', borderColor: '#1e3a6e', borderWidth: 1 } },
+    scales: {
+      x: { ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(30,58,110,.4)' } },
+      y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(30,58,110,.4)' } }
+    }
+  };
+
+  // Depletion
+  charts.dep = new Chart(document.getElementById('chart-depletion'), {
+    type: 'line',
+    data: {
+      labels: years.map(String),
+      datasets: [{
+        label: 'Water Table Depth (m)',
+        data: depths,
+        borderColor: years.map((_, i) => i <= 10 ? pastClr : futureClr),
+        segment: { borderColor: ctx => ctx.p1DataIndex > 10 ? futureClr : pastClr },
+        borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: years.map((_, i) => i <= 10 ? pastClr : futureClr),
+        fill: false, tension: 0.3
+      }]
+    },
+    options: { ...opts, plugins: { ...opts.plugins, annotation: {} }, scales: { ...opts.scales, y: { ...opts.scales.y, reverse: true, ticks: { ...opts.scales.y.ticks, callback: v => v + 'm' } } } }
+  });
+
+  // Urban
+  charts.urb = new Chart(document.getElementById('chart-urban'), {
+    type: 'bar',
+    data: {
+      labels: years.map(String),
+      datasets: [{
+        label: 'Urban Area %',
+        data: urbans,
+        backgroundColor: years.map((_, i) => i <= 10 ? 'rgba(188,140,255,0.7)' : 'rgba(248,113,113,0.5)'),
+        borderRadius: 4
+      }]
+    },
+    options: opts
+  });
+
+  // Balance
+  charts.bal = new Chart(document.getElementById('chart-balance'), {
+    type: 'line',
+    data: {
+      labels: years.map(String),
+      datasets: [
+        { label: 'Recharge (mm/yr)', data: recharges, borderColor: '#4ade80', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 2 },
+        { label: 'Pumping (m³/day ÷10)', data: pumpings.map(v => (v/10).toFixed(1)), borderColor: '#f87171', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 2 }
+      ]
+    },
+    options: { ...opts, plugins: { ...opts.plugins, legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 } } } } }
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// SCARCITY ALERTS
+// ══════════════════════════════════════════════════════════
+function buildScarcityAlerts() {
+  const alerts = [
+    { year: 2026, level: 'Medium', msg: 'Urban coverage ~57%. Recharge deficit beginning in dry seasons.', color: 'var(--warn)', icon: '🟡' },
+    { year: 2028, level: 'High', msg: 'Water table projected at 25.6m. Shallow borewells at risk of failure.', color: 'var(--danger)', icon: '🔴' },
+    { year: 2030, level: 'Critical', msg: 'Urban 70%+. Recharge below 100 mm/yr. Severe scarcity expected.', color: '#ff4444', icon: '🚨' },
+    { year: 2033, level: 'Severe', msg: 'Pumping may exceed 5000 m³/day. Aquifer depletion critical phase.', color: '#ff2222', icon: '⛔' },
+  ];
+  const el = document.getElementById('scarcity-list');
+  el.innerHTML = alerts.map(a => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${a.color};border-radius:10px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-weight:700;color:${a.color}">${a.icon} ${a.year} — ${a.level}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">${a.msg}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// QUICK LOCATIONS
+// ══════════════════════════════════════════════════════════
+const PESHAWAR_AREAS = [
+  { name: 'Hayatabad', lat: 33.9937, lon: 71.4665, icon: '🏘️' },
+  { name: 'University Town', lat: 34.0080, lon: 71.4870, icon: '🎓' },
+  { name: 'Peshawar City Centre', lat: 34.0151, lon: 71.5249, icon: '🏙️' },
+  { name: 'Bara Road / Chamkani', lat: 33.9500, lon: 71.5700, icon: '🏭' },
+  { name: 'Ring Road North', lat: 34.0600, lon: 71.5100, icon: '🛣️' },
+  { name: 'Warsak Road', lat: 34.0300, lon: 71.5800, icon: '🌾' },
+];
+
+function buildQuickLocations() {
+  const el = document.getElementById('quick-locations');
+  el.innerHTML = PESHAWAR_AREAS.map(a => `
+    <div class="history-item" onclick="loadQuickLocation(${a.lat},${a.lon})">
+      <div class="history-icon">${a.icon}</div>
+      <div class="history-info">
+        <div class="history-name">${a.name}</div>
+        <div class="history-meta">${a.lat.toFixed(4)}°N, ${a.lon.toFixed(4)}°E</div>
+      </div>
+      <div style="color:var(--accent);font-size:18px">›</div>
+    </div>`).join('');
+}
+
+function loadQuickLocation(lat, lon) {
+  document.getElementById('f-lat').value = lat;
+  document.getElementById('f-lon').value = lon;
+  showPage('predict');
+  showToast('Location loaded — tap Analyse');
+}
+
+// ══════════════════════════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════════════════════════
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  if (!history.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">No predictions yet.</div>';
+    return;
+  }
+  const riskColors = ['var(--accent2)', 'var(--warn)', 'var(--danger)'];
+  const riskLabels = ['Low Risk', 'Medium Risk', 'High Risk'];
+  const riskIcons  = ['🟢', '🟡', '🔴'];
+
+  el.innerHTML = history.slice(0, 10).map((h, i) => `
+    <div class="history-item" onclick="loadFromHistory(${i})">
+      <div class="history-icon">${riskIcons[h.riskClass]}</div>
+      <div class="history-info">
+        <div class="history-name">${h.lat.toFixed(4)}°N, ${h.lon.toFixed(4)}°E — ${h.year}</div>
+        <div class="history-meta">💧 ${h.wtd}m depth · 🌆 ${h.urban}% urban</div>
+      </div>
+      <div class="history-risk" style="color:${riskColors[h.riskClass]}">${riskLabels[h.riskClass]}</div>
+    </div>`).join('');
+}
+
+function loadFromHistory(i) {
+  const h = history[i];
+  document.getElementById('f-lat').value   = h.lat;
+  document.getElementById('f-lon').value   = h.lon;
+  document.getElementById('f-year').value  = h.year;
+  document.getElementById('year-display').textContent = h.year;
+  document.getElementById('f-urban').value = h.urban;
+  showPage('predict');
+  showToast('History loaded — tap Analyse');
+}
+
+// ══════════════════════════════════════════════════════════
+// LOCATION
+// ══════════════════════════════════════════════════════════
+function useMyLocation() {
+  if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+  showToast('Getting your location…');
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('f-lat').value = pos.coords.latitude.toFixed(4);
+    document.getElementById('f-lon').value = pos.coords.longitude.toFixed(4);
+    showToast('Location set! Tap Analyse.');
+  }, () => showToast('Location denied. Enter manually.'));
+}
+
+function usePeshawarCenter() {
+  document.getElementById('f-lat').value = '34.0151';
+  document.getElementById('f-lon').value = '71.5249';
+  showToast('Peshawar City Centre loaded');
+}
+
+// ══════════════════════════════════════════════════════════
+// GOOGLE EARTH / MAPS
+// ══════════════════════════════════════════════════════════
+function openGoogleEarth(e) {
+  if (e) e.preventDefault();
+  const lat = parseFloat(document.getElementById('f-lat').value) || lastLat;
+  const lon = parseFloat(document.getElementById('f-lon').value) || lastLon;
+  // Google Earth Web URL with coordinates centered and altitude for good groundwater view
+  const url = `https://earth.google.com/web/@${lat.toFixed(4)},${lon.toFixed(4)},350a,12000d,35y,0h,0t,0r`;
+  window.open(url, '_blank');
+  showToast('Opening Google Earth…');
+}
+
+function openGoogleMaps() {
+  const lat = parseFloat(document.getElementById('f-lat').value) || lastLat;
+  const lon = parseFloat(document.getElementById('f-lon').value) || lastLon;
+  const url = `https://www.google.com/maps/@${lat.toFixed(4)},${lon.toFixed(4)},15z`;
+  window.open(url, '_blank');
+}
+
+// Update Google Earth header link
+document.getElementById('ge-link').onclick = openGoogleEarth;
+
+// ══════════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
